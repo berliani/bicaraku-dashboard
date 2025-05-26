@@ -21,8 +21,8 @@ class MongoDBHandler:
     
     def get_last_update(self):
         last_article = self.collection.find_one(
-            sort=[("timestamp", -1)],  # Pastikan sorting benar
-            projection={"timestamp": 1}  # Hanya ambil field timestamp
+            sort=[("timestamp", -1)],  
+            projection={"timestamp": 1}  
         )
         
         if last_article and last_article.get("timestamp"):

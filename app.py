@@ -4,6 +4,11 @@ from scraping.service import run_scraping
 from collections import Counter
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud
+from apscheduler.schedulers.background import BackgroundScheduler
+from datetime import datetime, timedelta
+import pytz
+import threading
+import time
 
 # Initialize MongoDB
 @st.cache_resource
@@ -12,7 +17,7 @@ def init_db(connection_uri):
 
 # Get dashboard data
 @st.cache_data(ttl=600)
-def get_dashboard_data(sources, _db_handler):  # Tambahkan underscore
+def get_dashboard_data(sources, _db_handler): 
     articles = _db_handler.get_articles_by_sources(sources)
     
     # Process data
@@ -31,6 +36,29 @@ def get_dashboard_data(sources, _db_handler):  # Tambahkan underscore
         "last_update": _db_handler.get_last_update()
     }
 
+def init_scheduler(connection_uri):
+    scheduler = BackgroundScheduler(timezone=pytz.timezone('Asia/Jakarta'))
+    
+    # Jadwalkan scraping setiap hari jam 12:00 WIB
+    scheduler.add_job(
+        run_scraping,
+        'cron',
+        hour=12,
+        minute=0,
+        args=[connection_uri],
+        name='daily_scraping'
+    )
+    
+    # Jadwalkan scraping pertama 10 detik setelah start
+    scheduler.add_job(
+        run_scraping,
+        'date',
+        run_date=datetime.now() + timedelta(seconds=10),
+        args=[connection_uri]
+    )
+    
+    return scheduler
+
 def main():
     st.set_page_config(
         page_title="Analisis Speech Delay",
@@ -41,6 +69,12 @@ def main():
     # Setup connection
     connection_uri = st.secrets["mongo"]["uri"]
     db_handler = init_db(connection_uri)
+    
+    # Inisialisasi scheduler
+    if 'scheduler' not in st.session_state:
+        st.session_state.scheduler = init_scheduler(connection_uri)
+        st.session_state.scheduler.start()
+        st.rerun()
     
     # Sidebar controls
     with st.sidebar:
@@ -66,15 +100,15 @@ def main():
     # Get data
     data = get_dashboard_data(selected_sources, db_handler)
     
-    # Last update and stats
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Total Artikel", len(data["articles"]))
-    with col2:
-        st.metric("Sumber Terpilih", ", ".join(selected_sources))
-    with col3:
-        st.metric("Terakhir Update", data["last_update"])
-    
+    # Tampilkan status scheduler
+    with st.expander("🔄 Status Scheduler"):
+        if st.session_state.scheduler.running:
+            st.success("Scheduler aktif")
+            jobs = st.session_state.scheduler.get_jobs()
+            for job in jobs:
+                st.write(f"Job: {job.name} | Next run: {job.next_run_time}")
+        else:
+            st.error("Scheduler tidak aktif")
     # Visualizations
     col1, col2 = st.columns(2)
     
