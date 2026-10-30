@@ -141,8 +141,17 @@ def scrape_hellosehat(driver, db_handler):
 def run_scraping(connection_uri):
     chrome_options = Options()
     chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
-    driver = webdriver.Chrome(options=chrome_options)
+    chrome_options.add_argument("--remote-debugging-port=9222")
+    
+    # Biarkan selenium/webdriver-manager mendeteksi path sistem secara otomatis
+    try:
+        driver = webdriver.Chrome(options=chrome_options)
+    except Exception as e:
+        print(f"Gagal menginisialisasi ChromeDriver: {str(e)}")
+        return False
     
     db_handler = MongoDBHandler(connection_uri)
     
@@ -152,7 +161,7 @@ def run_scraping(connection_uri):
         # Scrape HelloSehat
         scrape_hellosehat(driver, db_handler)  
         # Scrape Wikipedia
-        keywords =relevant_keywords
+        keywords = relevant_keywords
         for kw in keywords:
             content = get_wikipedia_summary(kw)
             if content:
@@ -162,8 +171,6 @@ def run_scraping(connection_uri):
                     "keywords": extract_keywords(content),
                     "source": "Wikipedia"
                 })
-        
-                
         return True
     except Exception as e:
         print(f"Scraping error: {str(e)}")
