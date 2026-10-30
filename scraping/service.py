@@ -1,5 +1,9 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+from webdriver_manager.core.os_manager import DriverManager
+from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
 import re
 import time
@@ -144,13 +148,13 @@ def run_scraping(connection_uri):
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--remote-debugging-port=9222")
     
-    # Biarkan selenium/webdriver-manager mendeteksi path sistem secara otomatis
     try:
-        driver = webdriver.Chrome(options=chrome_options)
+        # Menggunakan webdriver-manager untuk otomatisasi driver di cloud
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
     except Exception as e:
-        print(f"Gagal menginisialisasi ChromeDriver: {str(e)}")
+        print(f"Gagal inisialisasi ChromeDriver: {str(e)}")
         return False
     
     db_handler = MongoDBHandler(connection_uri)
@@ -161,8 +165,7 @@ def run_scraping(connection_uri):
         # Scrape HelloSehat
         scrape_hellosehat(driver, db_handler)  
         # Scrape Wikipedia
-        keywords = relevant_keywords
-        for kw in keywords:
+        for kw in relevant_keywords:
             content = get_wikipedia_summary(kw)
             if content:
                 db_handler.upsert_article(kw, {
